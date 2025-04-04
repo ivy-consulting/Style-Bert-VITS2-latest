@@ -4,6 +4,7 @@ import json
 
 import numpy as np
 import torch
+import concurrent.futures
 from numpy.typing import NDArray
 from pydantic import BaseModel
 
@@ -206,6 +207,26 @@ class TTSModel:
                 f"{data.dtype} to 16-bit int format."
             )
         return data
+    
+    def tts_process(text, sdp_ratio, noise, noise_w, length, speaker_id, language, assist_text, assist_text_weight, style_vector, given_phone, given_tone, hyper_parameters, net_g, device):
+        # Function that processes each chunk of text using the 'infer' function
+        return infer(
+            text=text,
+            sdp_ratio=sdp_ratio,
+            noise_scale=noise,
+            noise_scale_w=noise_w,
+            length_scale=length,
+            sid=speaker_id,
+            language=language,
+            hps=hyper_parameters,
+            net_g=net_g,
+            device=device,
+            assist_text=assist_text,
+            assist_text_weight=assist_text_weight,
+            style_vec=style_vector,
+            given_phone=given_phone,
+            given_tone=given_tone,
+        )
 
     def infer(
         self,
@@ -297,31 +318,27 @@ class TTSModel:
                     given_tone=given_tone,
                 )
         else:
+            # Split text into chunks based on newlines
             texts = text.split("\n")
-            texts = [t for t in texts if t != ""]
+            texts = [t for t in texts if t != ""]  # Remove empty lines
             audios = []
-            with torch.no_grad():
+
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                # Use ThreadPoolExecutor to process text chunks in parallel
+                futures = []
                 for i, t in enumerate(texts):
-                    audios.append(
-                        infer(
-                            text=t,
-                            sdp_ratio=sdp_ratio,
-                            noise_scale=noise,
-                            noise_scale_w=noise_w,
-                            length_scale=length,
-                            sid=speaker_id,
-                            language=language,
-                            hps=self.hyper_parameters,
-                            net_g=self.__net_g,
-                            device=self.device,
-                            assist_text=assist_text,
-                            assist_text_weight=assist_text_weight,
-                            style_vec=style_vector,
-                        )
-                    )
+                    futures.append(executor.submit(tts_process, t, sdp_ratio, noise, noise_w, length, speaker_id, language, assist_text, assist_text_weight, style_vector, given_phone, given_tone, hyper_parameters, net_g, device))
+
+                    # Add a zero-padded audio for split interval if it's not the last chunk
                     if i != len(texts) - 1:
-                        audios.append(np.zeros(int(44100 * split_interval)))
-                audio = np.concatenate(audios)
+                        audios.append(np.zeros(int(44100 * split_interval)))  # Padding for pause between segments
+                
+                # Collect all processed audio results
+                for future in concurrent.futures.as_completed(futures):
+                    audios.append(future.result())
+
+            # Concatenate all audio chunks together
+            audio = np.concatenate(audios)
         logger.info("Audio data generated successfully")
         if not (pitch_scale == 1.0 and intonation_scale == 1.0):
             _, audio = adjust_voice(
