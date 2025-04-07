@@ -210,6 +210,9 @@ class TTSModel:
     
     def tts_process(self, index, text, sdp_ratio, noise, noise_w, length, speaker_id, language, assist_text, assist_text_weight, style_vector, given_phone, given_tone):
         # Function that processes each chunk of text using the 'infer' function
+        import time
+        start_t = time.time()
+        print("Processing chunk:", index, " started")
         audio_data = infer(
             text=text,
             sdp_ratio=sdp_ratio,
@@ -228,6 +231,9 @@ class TTSModel:
             given_tone=given_tone,
         )
 
+        print("Processing chunk:", index, " finished")
+
+        logger.info(f"Chunk {index} processed successfully! and took {time.time() - start_t} seconds")
         return (index, audio_data)
     # Function to split text based on punctuation and newlines
     def split_text_by_punctuation_and_newlines(self, text):
@@ -331,6 +337,10 @@ class TTSModel:
             texts = [t for t in texts if t != ""]  # Remove empty lines
             audios = []
 
+            import time 
+
+            start_t = time.time()
+
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 # Use ThreadPoolExecutor to process text chunks in parallel
                 futures = []
@@ -345,6 +355,8 @@ class TTSModel:
                 # Collect all processed audio results
                 results = [future.result() for future in concurrent.futures.as_completed(futures)]
 
+            logger.info(f"Total time taken before sorting: {time.time() - start_t} seconds")
+
             # Sort results by index to preserve the original order
             results.sort(key=lambda x: x[0])
 
@@ -353,6 +365,9 @@ class TTSModel:
 
             # Concatenate all audio chunks together
             audio = np.concatenate(audios)
+            end_t = time.time()
+            logger.info(f"Total time taken for parallel processing: {end_t - start_t} seconds")
+
         logger.info("Audio data generated successfully")
         if not (pitch_scale == 1.0 and intonation_scale == 1.0):
             _, audio = adjust_voice(
