@@ -238,9 +238,12 @@ class TTSModel:
     # Function to split text based on punctuation and newlines
     def split_text_by_punctuation_and_newlines(self, text):
         import re
-        # Define a regex pattern to match punctuation marks or newlines and split based on them
-        pattern = r'(?<=[。！？、．\n])'  # For Japanese, Chinese, English punctuation and newlines
-        return [chunk.strip() for chunk in re.split(pattern, text) if chunk.strip()]
+        # Define a regex pattern to split after sentence-ending punctuation or newlines
+        pattern = r'([。！？、．.!]\s*|[\n])'  # Split *after* punctuation followed by optional whitespace, or newline
+        chunks = [chunk.strip() for chunk in re.split(pattern, text) if chunk.strip()]
+        # Filter out standalone punctuation chunks that might remain
+        sentences = [chunk for chunk in chunks if not re.fullmatch(r'[。！？、．.! \n]+', chunk)]
+        return sentences
     
     def infer(
         self,
