@@ -336,7 +336,7 @@ class TTSModel:
                 futures = []
                 for i, t in enumerate(texts):
                     # Submit the task with the index
-                    futures.append(executor.submit(self.tts_process, i, t, sdp_ratio, noise, noise_w, length, speaker_id, language, assist_text, assist_text_weight, style_vector, given_phone, given_tone, hyper_parameters, net_g, device))
+                    futures.append(executor.submit(self.tts_process, i, t, sdp_ratio, noise, noise_w, length, speaker_id, language, assist_text, assist_text_weight, style_vector, given_phone, given_tone))
 
                     # Add a zero-padded audio for split interval if it's not the last chunk
                     if i != len(texts) - 1:
