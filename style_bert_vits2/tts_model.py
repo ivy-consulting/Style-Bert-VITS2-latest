@@ -208,7 +208,7 @@ class TTSModel:
             )
         return data
     
-    def tts_process(index, text, sdp_ratio, noise, noise_w, length, speaker_id, language, assist_text, assist_text_weight, style_vector, given_phone, given_tone, hyper_parameters, net_g, device):
+    def tts_process(self, index, text, sdp_ratio, noise, noise_w, length, speaker_id, language, assist_text, assist_text_weight, style_vector, given_phone, given_tone, hyper_parameters, net_g, device):
         # Function that processes each chunk of text using the 'infer' function
         audio_data = infer(
             text=text,
@@ -229,7 +229,13 @@ class TTSModel:
         )
 
         return (index, audio_data)
-
+    # Function to split text based on punctuation and newlines
+    def split_text_by_punctuation_and_newlines(self, text):
+        import re
+        # Define a regex pattern to match punctuation marks or newlines and split based on them
+        pattern = r'(?<=[。！？、．\n])'  # For Japanese, Chinese, English punctuation and newlines
+        return [chunk.strip() for chunk in re.split(pattern, text) if chunk.strip()]
+    
     def infer(
         self,
         text: str,
@@ -321,7 +327,7 @@ class TTSModel:
                 )
         else:
             # Split text into chunks based on newlines
-            texts = text.split("\n")
+            texts = self.split_text_by_punctuation_and_newlines(text)
             texts = [t for t in texts if t != ""]  # Remove empty lines
             audios = []
 
@@ -330,7 +336,7 @@ class TTSModel:
                 futures = []
                 for i, t in enumerate(texts):
                     # Submit the task with the index
-                    futures.append(executor.submit(tts_process, i, t, sdp_ratio, noise, noise_w, length, speaker_id, language, assist_text, assist_text_weight, style_vector, given_phone, given_tone, hyper_parameters, net_g, device))
+                    futures.append(executor.submit(self.tts_process, i, t, sdp_ratio, noise, noise_w, length, speaker_id, language, assist_text, assist_text_weight, style_vector, given_phone, given_tone, hyper_parameters, net_g, device))
 
                     # Add a zero-padded audio for split interval if it's not the last chunk
                     if i != len(texts) - 1:
