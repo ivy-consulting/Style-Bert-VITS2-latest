@@ -28,7 +28,7 @@ from style_bert_vits2.models.models_jp_extra import (
     SynthesizerTrn as SynthesizerTrnJPExtra,
 )
 from style_bert_vits2.voice import adjust_voice
-
+from concurrent.futures import ProcessPoolExecutor
 
 # Gradio の import は重いため、ここでは型チェック時のみ import する
 # ライブラリとしての利用を考慮し、TTSModelHolder の _for_gradio() 系メソッド以外では Gradio に依存しないようにする
@@ -349,7 +349,7 @@ class TTSModel:
 
             results = []
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            with ProcessPoolExecutor() as executor:
                 # Use ThreadPoolExecutor to process text chunks in parallel
                 futures = []
                 for i, t in enumerate(texts):
