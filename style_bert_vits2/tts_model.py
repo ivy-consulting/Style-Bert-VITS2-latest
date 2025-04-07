@@ -208,7 +208,7 @@ class TTSModel:
             )
         return data
     
-    def tts_process(self, index, text, sdp_ratio, noise, noise_w, length, speaker_id, language, assist_text, assist_text_weight, style_vector, given_phone, given_tone, hyper_parameters, net_g, device):
+    def tts_process(self, index, text, sdp_ratio, noise, noise_w, length, speaker_id, language, assist_text, assist_text_weight, style_vector, given_phone, given_tone):
         # Function that processes each chunk of text using the 'infer' function
         audio_data = infer(
             text=text,
@@ -218,9 +218,9 @@ class TTSModel:
             length_scale=length,
             sid=speaker_id,
             language=language,
-            hps=hyper_parameters,
-            net_g=net_g,
-            device=device,
+            hps=self.hyper_parameters,
+            net_g=self.__net_g,
+            device=self.device,
             assist_text=assist_text,
             assist_text_weight=assist_text_weight,
             style_vec=style_vector,
