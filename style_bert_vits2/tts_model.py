@@ -213,23 +213,24 @@ class TTSModel:
         import time
         start_t = time.time()
         print("Processing chunk:", index, " started")
-        audio_data = infer(
-            text=text,
-            sdp_ratio=sdp_ratio,
-            noise_scale=noise,
-            noise_scale_w=noise_w,
-            length_scale=length,
-            sid=speaker_id,
-            language=language,
-            hps=self.hyper_parameters,
-            net_g=self.__net_g,
-            device=self.device,
-            assist_text=assist_text,
-            assist_text_weight=assist_text_weight,
-            style_vec=style_vector,
-            given_phone=given_phone,
-            given_tone=given_tone,
-        )
+        with torch.no_grad():
+            audio_data = infer(
+                text=text,
+                sdp_ratio=sdp_ratio,
+                noise_scale=noise,
+                noise_scale_w=noise_w,
+                length_scale=length,
+                sid=speaker_id,
+                language=language,
+                hps=self.hyper_parameters,
+                net_g=self.__net_g,
+                device=self.device,
+                assist_text=assist_text,
+                assist_text_weight=assist_text_weight,
+                style_vec=style_vector,
+                given_phone=given_phone,
+                given_tone=given_tone,
+            )
 
         print("Processing chunk:", index, " finished")
 
