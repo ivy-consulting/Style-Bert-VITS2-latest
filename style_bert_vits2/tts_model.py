@@ -243,6 +243,9 @@ class TTSModel:
         chunks = [chunk.strip() for chunk in re.split(pattern, text) if chunk.strip()]
         # Filter out standalone punctuation chunks that might remain
         sentences = [chunk for chunk in chunks if not re.fullmatch(r'[。！？、．.! \n]+', chunk)]
+
+        # Debugging log
+        logger.info(f"Split text into {len(sentences)} sentences: {sentences}")
         return sentences
     
     def infer(
@@ -344,7 +347,9 @@ class TTSModel:
 
             start_t = time.time()
 
-            with concurrent.futures.ThreadPoolExecutor() as executor:
+            results = []
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
                 # Use ThreadPoolExecutor to process text chunks in parallel
                 futures = []
                 for i, t in enumerate(texts):
@@ -355,8 +360,16 @@ class TTSModel:
                     if i != len(texts) - 1:
                         audios.append(np.zeros(int(44100 * split_interval)))  # Padding for pause between segments
 
+                for future in concurrent.futures.as_completed(futures):
+                    # Wait for the future to complete and get the result
+                    try:
+                        result = future.result(timeout=30)
+                        if result is not None:
+                            results.append(result)  # Append the audio data
+                    except Exception as e:
+                        logger.error(f"Error processing chunk: {e}")
                 # Collect all processed audio results
-                results = [future.result() for future in concurrent.futures.as_completed(futures)]
+                # results = [future.result(timeout=30) for future in concurrent.futures.as_completed(futures)]
 
             logger.info(f"Total time taken before sorting: {time.time() - start_t} seconds")
 
