@@ -208,9 +208,9 @@ class TTSModel:
             )
         return data
     
-    def tts_process(text, sdp_ratio, noise, noise_w, length, speaker_id, language, assist_text, assist_text_weight, style_vector, given_phone, given_tone, hyper_parameters, net_g, device):
+    def tts_process(index, text, sdp_ratio, noise, noise_w, length, speaker_id, language, assist_text, assist_text_weight, style_vector, given_phone, given_tone, hyper_parameters, net_g, device):
         # Function that processes each chunk of text using the 'infer' function
-        return infer(
+        audio_data = infer(
             text=text,
             sdp_ratio=sdp_ratio,
             noise_scale=noise,
@@ -227,6 +227,8 @@ class TTSModel:
             given_phone=given_phone,
             given_tone=given_tone,
         )
+
+        return (index, audio_data)
 
     def infer(
         self,
@@ -327,15 +329,21 @@ class TTSModel:
                 # Use ThreadPoolExecutor to process text chunks in parallel
                 futures = []
                 for i, t in enumerate(texts):
-                    futures.append(executor.submit(tts_process, t, sdp_ratio, noise, noise_w, length, speaker_id, language, assist_text, assist_text_weight, style_vector, given_phone, given_tone, hyper_parameters, net_g, device))
+                    # Submit the task with the index
+                    futures.append(executor.submit(tts_process, i, t, sdp_ratio, noise, noise_w, length, speaker_id, language, assist_text, assist_text_weight, style_vector, given_phone, given_tone, hyper_parameters, net_g, device))
 
                     # Add a zero-padded audio for split interval if it's not the last chunk
                     if i != len(texts) - 1:
                         audios.append(np.zeros(int(44100 * split_interval)))  # Padding for pause between segments
-                
+
                 # Collect all processed audio results
-                for future in concurrent.futures.as_completed(futures):
-                    audios.append(future.result())
+                results = [future.result() for future in concurrent.futures.as_completed(futures)]
+
+            # Sort results by index to preserve the original order
+            results.sort(key=lambda x: x[0])
+
+            for _, audio_data in results:
+                audios.append(audio_data)
 
             # Concatenate all audio chunks together
             audio = np.concatenate(audios)
