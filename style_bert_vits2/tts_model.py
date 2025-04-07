@@ -214,7 +214,7 @@ class TTSModel:
         start_t = time.time()
         print("Processing chunk:", index, " started")
         with torch.no_grad():
-            audio_data = infer(
+            audio_tensor = infer(
                 text=text,
                 sdp_ratio=sdp_ratio,
                 noise_scale=noise,
@@ -231,6 +231,8 @@ class TTSModel:
                 given_phone=given_phone,
                 given_tone=given_tone,
             )
+
+        audio_data = audio_tensor.detach().cpu().numpy() 
 
         print("Processing chunk:", index, " finished")
 
