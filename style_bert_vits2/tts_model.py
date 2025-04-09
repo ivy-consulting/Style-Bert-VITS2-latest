@@ -87,6 +87,14 @@ def tts_process(
 
     audio_data = audio_tensor.detach().cpu().numpy()
 
+    # Clear GPU memory
+    if device == "cuda":
+        del net_g
+        del audio_tensor
+        torch.cuda.empty_cache()
+        logger.debug(f"Chunk {index} cleared GPU memory")
+
+
     print(f"Processing chunk: {index} finished")
     logger.info(f"Chunk {index} processed successfully! and took {time.time() - start_t} seconds")
     return (index, audio_data)
@@ -375,7 +383,7 @@ class TTSModel:
             start_t = time.time()
 
             results = []
-            with ProcessPoolExecutor(max_workers=4) as executor:
+            with ProcessPoolExecutor(max_workers=2) as executor:
                 futures = []
                 for i, t in enumerate(texts):
                     # Submit the task with the index
