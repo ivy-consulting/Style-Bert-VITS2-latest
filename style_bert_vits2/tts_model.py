@@ -36,6 +36,60 @@ from concurrent.futures import ProcessPoolExecutor
 # if TYPE_CHECKING:
 #     import gradio as gr
 
+def tts_process(
+    index: int,
+    text: str,
+    sdp_ratio: float,
+    noise: float,
+    noise_w: float,
+    length: float,
+    speaker_id: int,
+    language: str,
+    assist_text: Optional[str],
+    assist_text_weight: float,
+    style_vector: np.ndarray,
+    given_phone: Optional[list[str]],
+    given_tone: Optional[list[int]],
+    model_path: Path,
+    hyper_parameters: HyperParameters,
+    device: str
+) -> tuple[int, np.ndarray]:
+    import time
+    start_t = time.time()
+    print(f"Processing chunk: {index} started")
+
+    # Load the model in this process
+    net_g = get_net_g(
+        model_path=str(model_path),
+        version=hyper_parameters.version,
+        device=device,
+        hps=hyper_parameters,
+    )
+
+    with torch.no_grad():
+        audio_tensor = infer(
+            text=text,
+            sdp_ratio=sdp_ratio,
+            noise_scale=noise,
+            noise_scale_w=noise_w,
+            length_scale=length,
+            sid=speaker_id,
+            language=language,
+            hps=hyper_parameters,
+            net_g=net_g,
+            device=device,
+            assist_text=assist_text,
+            assist_text_weight=assist_text_weight,
+            style_vec=style_vector,
+            given_phone=given_phone,
+            given_tone=given_tone,
+        )
+
+    audio_data = audio_tensor.detach().cpu().numpy()
+
+    print(f"Processing chunk: {index} finished")
+    logger.info(f"Chunk {index} processed successfully! and took {time.time() - start_t} seconds")
+    return (index, audio_data)
 
 class TTSModel:
     """
@@ -208,36 +262,7 @@ class TTSModel:
             )
         return data
     
-    def tts_process(self, index, text, sdp_ratio, noise, noise_w, length, speaker_id, language, assist_text, assist_text_weight, style_vector, given_phone, given_tone):
-        # Function that processes each chunk of text using the 'infer' function
-        import time
-        start_t = time.time()
-        print("Processing chunk:", index, " started")
-        with torch.no_grad():
-            audio_tensor = infer(
-                text=text,
-                sdp_ratio=sdp_ratio,
-                noise_scale=noise,
-                noise_scale_w=noise_w,
-                length_scale=length,
-                sid=speaker_id,
-                language=language,
-                hps=self.hyper_parameters,
-                net_g=self.__net_g,
-                device=self.device,
-                assist_text=assist_text,
-                assist_text_weight=assist_text_weight,
-                style_vec=style_vector,
-                given_phone=given_phone,
-                given_tone=given_tone,
-            )
-
-        audio_data = audio_tensor.detach().cpu().numpy() 
-
-        print("Processing chunk:", index, " finished")
-
-        logger.info(f"Chunk {index} processed successfully! and took {time.time() - start_t} seconds")
-        return (index, audio_data)
+    
     # Function to split text based on punctuation and newlines
     def split_text_by_punctuation_and_newlines(self, text):
         import re
@@ -346,33 +371,47 @@ class TTSModel:
             texts = [t for t in texts if t != ""]  # Remove empty lines
             audios = []
 
-            import time 
-
+            import time
             start_t = time.time()
 
             results = []
-
-            with ProcessPoolExecutor() as executor:
-                # Use ThreadPoolExecutor to process text chunks in parallel
+            with ProcessPoolExecutor(max_workers=4) as executor:
                 futures = []
                 for i, t in enumerate(texts):
                     # Submit the task with the index
-                    futures.append(executor.submit(self.tts_process, i, t, sdp_ratio, noise, noise_w, length, speaker_id, language, assist_text, assist_text_weight, style_vector, given_phone, given_tone))
+                    futures.append(
+                        executor.submit(
+                            tts_process,
+                            i,
+                            t,
+                            sdp_ratio,
+                            noise,
+                            noise_w,
+                            length,
+                            speaker_id,
+                            language,
+                            assist_text,
+                            assist_text_weight,
+                            style_vector,
+                            given_phone,
+                            given_tone,
+                            self.model_path,
+                            self.hyper_parameters,
+                            self.device,
+                        )
+                    )
 
                     # Add a zero-padded audio for split interval if it's not the last chunk
                     if i != len(texts) - 1:
-                        audios.append(np.zeros(int(44100 * split_interval)))  # Padding for pause between segments
+                        audios.append(np.zeros(int(44100 * split_interval)))
 
                 for future in concurrent.futures.as_completed(futures):
-                    # Wait for the future to complete and get the result
                     try:
                         result = future.result(timeout=30)
                         if result is not None:
-                            results.append(result)  # Append the audio data
+                            results.append(result)
                     except Exception as e:
                         logger.error(f"Error processing chunk: {e}")
-                # Collect all processed audio results
-                # results = [future.result(timeout=30) for future in concurrent.futures.as_completed(futures)]
 
             logger.info(f"Total time taken before sorting: {time.time() - start_t} seconds")
 
@@ -386,6 +425,7 @@ class TTSModel:
             audio = np.concatenate(audios)
             end_t = time.time()
             logger.info(f"Total time taken for parallel processing: {end_t - start_t} seconds")
+
 
         logger.info("Audio data generated successfully")
         if not (pitch_scale == 1.0 and intonation_scale == 1.0):
